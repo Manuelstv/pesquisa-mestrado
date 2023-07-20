@@ -6,6 +6,8 @@ import torch
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import torch.nn as nn
+import torch.nn.functional as F
 
 class CustomDataset(Dataset):
     def __init__(self, dataframe, directory, transform=None):
@@ -19,7 +21,6 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         img_name = os.path.join(self.directory, self.dataframe.iloc[idx, 1]) # Assuming 'combined' contains the image file names
         image = Image.open(img_name).convert('RGB')
-        #labels = torch.tensor(self.dataframe.iloc[idx, 2:].values, dtype=torch.float32)
         labels = torch.tensor(self.dataframe.iloc[idx, 2:].values.astype(np.float32))  # Convert labels to float32
 
         if self.transform:
@@ -49,34 +50,7 @@ batch_size = 4
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
-
-def visualize_data(data_loader, num_images=4):
-    # Get an iterator for the data loader
-    data_iter = iter(data_loader)
-
-    # Get the next batch of data
-    images, labels = next(data_iter)
-
-    # Create a figure with subplots
-    fig, axes = plt.subplots(nrows=num_images, ncols=1, figsize=(8, 12))
-
-    for i in range(num_images):
-        image = images[i].permute(1, 2, 0)  # Convert tensor to (H, W, C) format for imshow
-        label = labels[i]
-
-        axes[i].imshow(image)
-        axes[i].set_title(f"Labels: {label}")
-
-    plt.tight_layout()
-    plt.show()
-
-# Example usage:
-#visualize_data(train_loader, num_images=4)
-
-
-import torch
-import torch.nn as nn
-
+# Define the model
 class CustomCNN(nn.Module):
     def __init__(self):
         super(CustomCNN, self).__init__()
@@ -105,29 +79,11 @@ class CustomCNN(nn.Module):
             nn.Conv2d(256, 256, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            nn.Conv2d(256, 512, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(512, 512, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            nn.Conv2d(512, 1024, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(1024, 1024, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            nn.Conv2d(1024, 2048, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(2048, 2048, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2)
         )
         
         self.fc_layers = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(8192, 512),
+            nn.Linear(256 * 32 * 64, 512),  # Update this to match the output size from the convolutional layers
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(512, 40),
@@ -136,21 +92,22 @@ class CustomCNN(nn.Module):
 
     def forward(self, x):
         x = self.conv_layers(x)
+        # print(x.shape)  # Print the shape of the tensor after convolutional layers
         x = self.fc_layers(x)
-        return x
+        return x  
+
 
 # Create an instance of the model
 model = CustomCNN()
 
-# Define the optimizer and loss function
-optimizer = torch.optim.RMSprop(model.parameters(), lr=0.001)
-criterion = nn.BCELoss()
 
 # Move the model to the GPU if available
 if torch.cuda.is_available():
     model = model.cuda()
 
-# Assuming you have already defined the model, optimizer, and criterion as shown in the previous code.
+# Define the optimizer and loss function
+optimizer = torch.optim.RMSprop(model.parameters(), lr=0.001)
+criterion = nn.BCEWithLogitsLoss()
 
 # Training parameters
 epochs = 10
@@ -158,34 +115,32 @@ epochs = 10
 # Training loop
 for epoch in range(epochs):
     model.train()  # Set the model to training mode
-    
+
     running_loss = 0.0
-    correct_predictions = 0
     total_samples = 0
-    
+
     for i, (inputs, labels) in enumerate(train_loader):
         # Move data to the GPU if available
         if torch.cuda.is_available():
             inputs = inputs.cuda()
             labels = labels.cuda()
-        
+
         # Zero the parameter gradients
         optimizer.zero_grad()
-        
+
         # Forward pass
         outputs = model(inputs)
-        
+
         # Calculate loss
         loss = criterion(outputs, labels)
-        
+
         # Backpropagation and optimization
         loss.backward()
         optimizer.step()
-        
+
         # Update statistics
         running_loss += loss.item()
         total_samples += inputs.size(0)
-        
+
     # Print training statistics for each epoch
     print(f"Epoch [{epoch + 1}/{epochs}], Loss: {running_loss / total_samples:.4f}")
-
