@@ -7,6 +7,8 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn as nn
+from sklearn.metrics import accuracy_score, precision_score, recall_score
+
 import torch.nn.functional as F
 
 class CustomDataset(Dataset):
@@ -112,6 +114,7 @@ criterion = nn.BCEWithLogitsLoss()
 # Training parameters
 epochs = 10
 
+'''
 # Training loop
 for epoch in range(epochs):
     model.train()  # Set the model to training mode
@@ -144,3 +147,52 @@ for epoch in range(epochs):
 
     # Print training statistics for each epoch
     print(f"Epoch [{epoch + 1}/{epochs}], Loss: {running_loss / total_samples:.4f}")
+'''
+
+model.load_state_dict(torch.load("trained_model_weights.pth"))
+#torch.save(model.state_dict(), "trained_model_weights.pth")
+
+def evaluate_model(model, data_loader):
+    model.eval()  # Set the model to evaluation mode
+    device = next(model.parameters()).device
+    test_loss = 0
+    test_total_samples = 0
+
+    with torch.no_grad():
+        all_predictions = []
+        all_labels = []
+
+        for inputs, labels in data_loader:
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
+            # Forward pass
+            outputs = model(inputs)
+            #print(outputs)
+
+            # Convert the sigmoid outputs to binary predictions
+            predictions = (outputs).float()
+
+            all_predictions.append(predictions.cpu())
+            all_labels.append(labels.cpu())
+            print(all_predictions)
+
+            # Calculate test loss
+            test_loss += criterion(outputs, labels).item()
+            test_total_samples += inputs.size(0)
+
+        all_predictions = torch.cat(all_predictions)
+        all_labels = torch.cat(all_labels)  
+
+    accuracy = accuracy_score(all_labels, all_predictions)
+    precision = precision_score(all_labels, all_predictions, average='micro')
+    recall = recall_score(all_labels, all_predictions, average='micro')
+
+    return accuracy, precision, recall
+
+# Assuming you have already trained the model and have the test_loader
+accuracy, precision, recall = evaluate_model(model, test_loader)
+
+print(f"Test Accuracy: {accuracy:.4f}")
+print(f"Test Precision: {precision:.4f}")
+print(f"Test Recall: {recall:.4f}")
