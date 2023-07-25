@@ -32,7 +32,7 @@ class CustomDataset(Dataset):
 
 
 data_transform = transforms.Compose([
-    transforms.Resize((512, 1024)),
+    transforms.Resize((256, 512)),
     transforms.ToTensor()])
 
 # Load the full CSV file
@@ -47,56 +47,85 @@ train_dataset = CustomDataset(train_df, "/home/mstveras/structured3d_repo/struct
 test_dataset = CustomDataset(test_df, "/home/mstveras/structured3d_repo/struct3d_images", transform=data_transform)
 
 # Define batch size and set shuffle to True (if needed)
-batch_size = 4
+batch_size = 2
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
-# Define the model
+
+
 class CustomCNN(nn.Module):
     def __init__(self):
         super(CustomCNN, self).__init__()
-
-        self.conv_layers = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(128, 128, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            
-            nn.Conv2d(128, 256, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(256, 256, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-        )
-        
-        self.fc_layers = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(256 * 32 * 64, 512),  # Update this to match the output size from the convolutional layers
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(512, 40),
-            nn.Sigmoid()
-        )
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(256, 512, kernel_size=3, padding=1)
+        self.conv6 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.conv7 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.conv8 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.conv9 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.fc1 = nn.Linear(512 * 8 * 16, 4096)
+        self.fc2 = nn.Linear(4096, 4096)
+        self.fc3 = nn.Linear(4096, 40)
+        self.dropout = nn.Dropout(0.5)
 
     def forward(self, x):
-        x = self.conv_layers(x)
-        # print(x.shape)  # Print the shape of the tensor after convolutional layers
-        x = self.fc_layers(x)
-        return x  
+        x = F.relu(F.max_pool2d(self.conv1(x), 2))
+        x = F.relu(F.max_pool2d(self.conv2(x), 2))
+        x = F.relu(self.conv3(x))
+        x = F.relu(self.conv4(x))
+        x = F.relu(F.max_pool2d(self.conv5(x), 2))
+        x = F.relu(self.conv6(x))
+        x = F.relu(self.conv7(x))
+        x = F.relu(F.max_pool2d(self.conv8(x), 2))
+        x = F.relu(self.conv9(x))
+        x = F.relu(F.max_pool2d(x, 2))
+        
+        x = x.view(-1, 512 * 8 * 16) 
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+
+        return x
+
+
+
+# Define the model
+class CustomCNN2(nn.Module):
+    def __init__(self):
+        super(CustomCNN2, self).__init__()
+        self.conv1 = nn.Conv2d(3, 3*2, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(3*2, 3*4, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(3*4, 3*8, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(3*8, 3*16, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(3*16, 3*32, kernel_size=3, padding=1)
+        self.conv6 = nn.Conv2d(3*32, 3*64, kernel_size=3, padding=1)
+        self.conv7 = nn.Conv2d(3*64, 3*128, kernel_size=3, padding=1)
+        self.conv8 = nn.Conv2d(3*128, 3*256, kernel_size=3, padding=1)
+        self.conv9 = nn.Conv2d(3*256, 3*512, kernel_size=3, padding=1)
+        #self.conv6 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        #self.fc = nn.Linear(8192, 4096)
+        self.fully = nn.Sequential(nn.Linear(6144, 3072), nn.Dropout(0.5), nn.Linear(3072, 40))
+
+    def forward(self, x):
+        x = F.relu(F.max_pool2d(self.conv1(x), 2))
+        x = F.relu(F.max_pool2d(self.conv2(x), 2))
+        x = F.relu(F.max_pool2d(self.conv3(x), 2))
+        x = F.relu(F.max_pool2d(self.conv4(x), 2))
+        x = F.relu(F.max_pool2d(self.conv5(x), 2)) 
+        x = F.relu(F.max_pool2d(self.conv6(x), 2))
+        x = F.relu(F.max_pool2d(self.conv7(x), 2))
+        x = F.relu(F.max_pool2d(self.conv8(x), 2)) 
+        #x = F.relu(F.max_pool2d(self.conv9(x), 2))
+        
+        #print(x.size())
+        x = x.view(-1, 6144) 
+        x = self.fully(x)
+        #print(x.size())
+        return x
 
 
 # Create an instance of the model
@@ -114,7 +143,6 @@ criterion = nn.BCEWithLogitsLoss()
 # Training parameters
 epochs = 10
 
-'''
 # Training loop
 for epoch in range(epochs):
     model.train()  # Set the model to training mode
@@ -147,7 +175,6 @@ for epoch in range(epochs):
 
     # Print training statistics for each epoch
     print(f"Epoch [{epoch + 1}/{epochs}], Loss: {running_loss / total_samples:.4f}")
-'''
 
 model.load_state_dict(torch.load("trained_model_weights.pth"))
 #torch.save(model.state_dict(), "trained_model_weights.pth")
