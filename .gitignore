@@ -1,2 +1,4 @@
-struct3d_images
+Structured3D
 trained_model_weights.pth
+structured3d_repo
+trained_model_weights_equi.pth

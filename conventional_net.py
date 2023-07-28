@@ -40,18 +40,18 @@ data_transform = transforms.Compose([
     transforms.ToTensor()])
 
 # Load the full CSV file
-df = pd.read_csv('/home/mstveras/structured3d_repo/img_classes.csv')
+df = pd.read_csv('/home/mstveras/pesquisa-mestrado/img_classes_equi.csv')
 
 # Split the DataFrame into train and test sets (you can modify this accordingly)
 train_df = df[:1000]
 test_df = df[1000:]
 
 # Create custom datasets and data loaders
-train_dataset = CustomDataset(train_df, "/home/mstveras/structured3d_repo/struct3d_images", transform=data_transform)
-test_dataset = CustomDataset(test_df, "/home/mstveras/structured3d_repo/struct3d_images", transform=data_transform)
+train_dataset = CustomDataset(train_df, "/home/mstveras/pesquisa-mestrado/structured3d_repo/struct3d_images", transform=data_transform)
+test_dataset = CustomDataset(test_df, "/home/mstveras/pesquisa-mestrado/structured3d_repo/struct3d_images", transform=data_transform)
 
 # Define batch size and set shuffle to True (if needed)
-batch_size = 3
+batch_size = 1
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
@@ -60,7 +60,7 @@ test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
 class CustomCNN2(nn.Module):
     def __init__(self):
-        super(CustomCNN2, self).__init__()
+        super(CustomCNN, self).__init__()
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
@@ -72,7 +72,9 @@ class CustomCNN2(nn.Module):
         self.conv9 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
         self.fc1 = nn.Linear(512 * 8 * 16, 4096)
         self.fc2 = nn.Linear(4096, 4096)
-        self.fc3 = nn.Linear(4096, 40)
+        self.fc3 = nn.Linear(4096, 2048)
+        self.fc4 = nn.Linear(2048, 1024)
+        self.fc5 = nn.Linear(1024, 40)
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, x):
@@ -91,8 +93,12 @@ class CustomCNN2(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
         x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        #x = nn.Sigmoid(x)
+        x = self.dropout(x)
+        x = F.relu(self.fc3(x))
+        x = self.dropout(x)
+        x = F.relu(self.fc4(x))
+        x = self.dropout(x)
+        x = self.fc5(x)
 
         return x
 
@@ -109,11 +115,11 @@ class CustomCNN(nn.Module):
         self.conv5 = nn.Conv2d(3*16, 3*32, kernel_size=3, padding=1)
         self.conv6 = nn.Conv2d(3*32, 3*64, kernel_size=3, padding=1)
         self.conv7 = nn.Conv2d(3*64, 3*128, kernel_size=3, padding=1)
-        self.conv8 = nn.Conv2d(3*128, 3*256, kernel_size=3, padding=1)
-        self.conv9 = nn.Conv2d(3*256, 3*512, kernel_size=3, padding=1)
+        #self.conv8 = nn.Conv2d(3*128, 3*128, kernel_size=3, padding=1)
+        #self.conv9 = nn.Conv2d(3*256, 3*512, kernel_size=3, padding=1)
         #self.conv6 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
         #self.fc = nn.Linear(8192, 4096)
-        self.fully = nn.Sequential(nn.Linear(3072, 1536), nn.Dropout(0.2), nn.Linear(1536, 40))
+        self.fully = nn.Sequential(nn.Linear(3072, 6))
 
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
@@ -142,11 +148,11 @@ if torch.cuda.is_available():
     model = model.cuda()
 
 # Define the optimizer and loss function
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-1)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 criterion = nn.BCEWithLogitsLoss()
 
 # Training parameters
-epochs = 30
+epochs = 10
 
 # Training loop
 for epoch in range(epochs):
@@ -184,7 +190,7 @@ for epoch in range(epochs):
     print(f"Epoch [{epoch + 1}/{epochs}], Loss: {running_loss / total_samples:.4f}")
 
 
-torch.save(model.state_dict(), "trained_model_weights.pth")
+torch.save(model.state_dict(), "trained_model_weights_equi.pth")
 
 #model.load_state_dict(torch.load("trained_model_weights.pth"))
 
@@ -209,6 +215,7 @@ def evaluate_model(model, data_loader):
 
             # Convert the sigmoid outputs to binary predictions
             predictions = (torch.sigmoid(outputs)> 0.5).float()
+            print(predictions)
 
             all_predictions.append(predictions.cpu())
             all_labels.append(labels.cpu())
