@@ -48,7 +48,7 @@ dictionary = {
 }
 
 cores = np.array([
-    (0, 0, 0),
+    #(0, 0, 0),
     (174, 199, 232),    # wall
     (152, 223, 138),    # floor
     (31, 119, 180),     # cabinet
@@ -91,7 +91,7 @@ cores = np.array([
     (100, 85, 144)
 ])
 
-root_dir = '/home/mstveras/Structured3D_panorama_09_new(1)/Structured3D_panorama_09_new/Structured3D'
+root_dir = '/home/mstveras/pesquisa-mestrado/Structured3D'
 
 df = pd.DataFrame()
 
@@ -117,10 +117,11 @@ for dirpath, dirnames, filenames in os.walk(root_dir):
             parts = image_path.split('/')
             # Encontrar a parte que contém "scene_*"
             scene_part = [part for part in parts if part.startswith("scene_")]
-            
+            print(parts)
+            print(unique_colors)
             row_data = {
-            'col1': parts[6],
-            'col2': parts[8],
+            'col1': parts[5],
+            'col2': parts[7],
             'col3': indices_cores
             }
             df = df.append(row_data, ignore_index=True)
@@ -144,4 +145,24 @@ for value in range(0, 40):
 # Drop unnecessary columns
 df = df.drop(['col1', 'col2', 'col3'], axis=1)
 
+T = 500
+
+# Calculate the sum of each column
+column_sums = df.iloc[:, 1:].sum()
+
+# Create a boolean mask for columns whose sum is smaller than T
+mask = column_sums < T
+
+# Drop columns based on the mask
+df = df.drop(df.columns[1:][mask], axis=1)
+
+column_sums = df.iloc[:, 1:].sum()
+# Create a boolean mask for columns whose sum is smaller than T
+mask = column_sums > 600
+
+# Drop columns based on the mask
+df = df.drop(df.columns[1:][mask], axis=1)
+
+
 df.to_csv('img_classes2.csv')
+

@@ -12,6 +12,8 @@ import torch.nn.functional as F
 torch.cuda.empty_cache()
 from sklearn.metrics import hamming_loss, jaccard_score, f1_score
 
+import torchvision.models as models
+
 class CustomDataset(Dataset):
     def __init__(self, dataframe, directory, transform=None):
         self.dataframe = dataframe
@@ -36,11 +38,11 @@ class CustomDataset(Dataset):
 
 
 data_transform = transforms.Compose([
-    transforms.Resize((256, 512)),
+    transforms.Resize((512, 1024)),
     transforms.ToTensor()])
 
 # Load the full CSV file
-df = pd.read_csv('/home/mstveras/pesquisa-mestrado/img_classes_equi.csv')
+df = pd.read_csv('/home/mstveras/pesquisa-mestrado/img_classes2.csv')
 
 # Split the DataFrame into train and test sets (you can modify this accordingly)
 train_df = df[:1000]
@@ -51,7 +53,7 @@ train_dataset = CustomDataset(train_df, "/home/mstveras/pesquisa-mestrado/struct
 test_dataset = CustomDataset(test_df, "/home/mstveras/pesquisa-mestrado/structured3d_repo/struct3d_images", transform=data_transform)
 
 # Define batch size and set shuffle to True (if needed)
-batch_size = 1
+batch_size = 4
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
@@ -61,48 +63,41 @@ test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 class CustomCNN2(nn.Module):
     def __init__(self):
         super(CustomCNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
-        self.conv4 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
         self.conv5 = nn.Conv2d(256, 512, kernel_size=3, padding=1)
-        self.conv6 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
-        self.conv7 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
-        self.conv8 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
-        self.conv9 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
-        self.fc1 = nn.Linear(512 * 8 * 16, 4096)
-        self.fc2 = nn.Linear(4096, 4096)
-        self.fc3 = nn.Linear(4096, 2048)
-        self.fc4 = nn.Linear(2048, 1024)
-        self.fc5 = nn.Linear(1024, 40)
-        self.dropout = nn.Dropout(0.5)
+        self.conv6 = nn.Conv2d(512, 1024, kernel_size=3, padding=1)
+        self.conv7 = nn.Conv2d(1024, 2048, kernel_size=3, padding=1)
+        self.conv8 = nn.Conv2d(2048, 4096, kernel_size=3, padding=1)
+        self.fc1 = nn.Linear(8192, 4096)
+        self.fc2 = nn.Linear(4096, 2048)
+        self.fc3 = nn.Linear(2048, 6)
 
     def forward(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = F.relu(F.max_pool2d(self.conv2(x), 2))
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, 2)
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2)
         x = F.relu(self.conv3(x))
+        x = F.max_pool2d(x, 2)
         x = F.relu(self.conv4(x))
-        x = F.relu(F.max_pool2d(self.conv5(x), 2))
+        x = F.max_pool2d(x, 2) 
+        x = F.relu(self.conv5(x))
+        x = F.max_pool2d(x, 2)
         x = F.relu(self.conv6(x))
+        x = F.max_pool2d(x, 2)
         x = F.relu(self.conv7(x))
-        x = F.relu(F.max_pool2d(self.conv8(x), 2))
-        x = F.relu(self.conv9(x))
-        x = F.relu(F.max_pool2d(x, 2))
+        x = F.max_pool2d(x, 2)
+        x = F.relu(self.conv8(x))
+        x = F.max_pool2d(x, 2)
         
-        x = x.view(-1, 512 * 8 * 16) 
+        x = x.view(-1, 8192) 
         x = F.relu(self.fc1(x))
-        x = self.dropout(x)
         x = F.relu(self.fc2(x))
-        x = self.dropout(x)
-        x = F.relu(self.fc3(x))
-        x = self.dropout(x)
-        x = F.relu(self.fc4(x))
-        x = self.dropout(x)
-        x = self.fc5(x)
-
+        x = self.fc3(x)
         return x
-
-
 
 # Define the model
 class CustomCNN(nn.Module):
@@ -115,11 +110,11 @@ class CustomCNN(nn.Module):
         self.conv5 = nn.Conv2d(3*16, 3*32, kernel_size=3, padding=1)
         self.conv6 = nn.Conv2d(3*32, 3*64, kernel_size=3, padding=1)
         self.conv7 = nn.Conv2d(3*64, 3*128, kernel_size=3, padding=1)
-        #self.conv8 = nn.Conv2d(3*128, 3*128, kernel_size=3, padding=1)
-        #self.conv9 = nn.Conv2d(3*256, 3*512, kernel_size=3, padding=1)
+        self.conv8 = nn.Conv2d(3*128, 3*256, kernel_size=3, padding=1)
+        self.conv9 = nn.Conv2d(3*256, 3*512, kernel_size=3, padding=1)
         #self.conv6 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
         #self.fc = nn.Linear(8192, 4096)
-        self.fully = nn.Sequential(nn.Linear(3072, 6))
+        self.fully = nn.Sequential(nn.Linear(3072, 2))
 
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
@@ -129,8 +124,8 @@ class CustomCNN(nn.Module):
         x = F.relu(F.max_pool2d(self.conv5(x), 2)) 
         x = F.relu(F.max_pool2d(self.conv6(x), 2))
         x = F.relu(F.max_pool2d(self.conv7(x), 2))
-        #x = F.relu(F.max_pool2d(self.conv8(x), 2)) 
-        #x = F.relu(F.max_pool2d(self.conv9(x), 2))
+        x = F.relu(F.max_pool2d(self.conv8(x), 2)) 
+        x = F.relu(F.max_pool2d(self.conv9(x), 2))
         
         #print(x.size())
         x = x.view(-1, 3072) 
@@ -138,6 +133,11 @@ class CustomCNN(nn.Module):
         #print(x.size())
         return x
 
+def CustomCNN2():
+    vgg16 = models.vgg16(pretrained=True)
+    # Modify the classifier to match the output size of CustomCNN (6 classes)
+    vgg16.classifier[40] = nn.Linear(4096, 40)
+    return vgg16
 
 # Create an instance of the model
 model = CustomCNN()
@@ -148,11 +148,11 @@ if torch.cuda.is_available():
     model = model.cuda()
 
 # Define the optimizer and loss function
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 criterion = nn.BCEWithLogitsLoss()
 
 # Training parameters
-epochs = 10
+epochs = 50
 
 # Training loop
 for epoch in range(epochs):
@@ -172,8 +172,8 @@ for epoch in range(epochs):
 
         # Forward pass
         outputs = model(inputs)
-        #outputs = torch.sigmoid(outputs)
-        #print(torch.sigmoid(outputs))
+        #print(outputs)
+        #print(labels)
 
         # Calculate loss
         loss = criterion(outputs, labels)
