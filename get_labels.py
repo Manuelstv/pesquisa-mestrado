@@ -117,8 +117,6 @@ for dirpath, dirnames, filenames in os.walk(root_dir):
             parts = image_path.split('/')
             # Encontrar a parte que contém "scene_*"
             scene_part = [part for part in parts if part.startswith("scene_")]
-            print(parts)
-            print(unique_colors)
             row_data = {
             'col1': parts[5],
             'col2': parts[7],
@@ -145,7 +143,9 @@ for value in range(0, 40):
 # Drop unnecessary columns
 df = df.drop(['col1', 'col2', 'col3'], axis=1)
 
-T = 500
+print(df.sum())
+
+T = 200
 
 # Calculate the sum of each column
 column_sums = df.iloc[:, 1:].sum()
@@ -157,12 +157,12 @@ mask = column_sums < T
 df = df.drop(df.columns[1:][mask], axis=1)
 
 column_sums = df.iloc[:, 1:].sum()
-# Create a boolean mask for columns whose sum is smaller than T
-mask = column_sums > 600
+# Create a boolean mask for columns whose sum is bigger than T
+mask = column_sums > 900
 
 # Drop columns based on the mask
 df = df.drop(df.columns[1:][mask], axis=1)
 
 
-df.to_csv('img_classes2.csv')
+df.to_csv('img_classess.csv')
 
