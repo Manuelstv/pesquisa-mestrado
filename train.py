@@ -79,28 +79,8 @@ class CustomDataset(Dataset):
 
         return image, labels
 
-
-data_transform = transforms.Compose([
-    transforms.Resize((512, 1024)),
-    transforms.ToTensor()])
-
-# Load the full CSV file
-df = pd.read_csv('/home/mstveras/pesquisa-mestrado/img_classes2.csv')
-
-# Split the DataFrame into train and test sets (you can modify this accordingly)
-train_df = df[:1000]
-test_df = df[1000:]
-
-# Create custom datasets and data loaders
-train_dataset = CustomDataset(train_df, "/home/mstveras/pesquisa-mestrado/structured3d_repo/struct3d_images", transform=data_transform)
-test_dataset = CustomDataset(test_df, "/home/mstveras/pesquisa-mestrado/structured3d_repo/struct3d_images", transform=data_transform)
-
-batch_size = 4
-
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
-
-def evaluate_model(model, data_loader):
+def test(model, data_loader):
+    criterion = nn.BCEWithLogitsLoss()
     model.eval() 
     device = next(model.parameters()).device
     test_loss = 0
@@ -135,11 +115,14 @@ def evaluate_model(model, data_loader):
     all_predictions = np.vstack(all_predictions)
     all_labels = np.vstack(all_labels)
 
+    test_loss = test_loss/test_total_samples
+
     #precision = precision_score(all_labels, all_predictions, average='micro')
     #recall = recall_score(all_labels, all_predictions, average='micro')
     #f1 = f1_score(all_labels, all_predictions, average='micro')
-    print(f'test loss = {test_loss/test_total_samples}')
+    print(f'Test loss = {test_loss}')
     #print(f'precision = {precision}, recall = {recall}, f1-score= {f1_score}')
+    return test_loss
 
 # Define the model
 class CustomCNN(nn.Module):
@@ -196,44 +179,117 @@ class CustomVGG16(nn.Module):
     def forward(self, x):
         return self.vgg16(x)
 
-# Create an instance of the model
-#model = CustomVGG16(num_classes=11)
-model = SphereNet()
-
-if torch.cuda.is_available():
-    model = model.cuda()
-
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-criterion = nn.BCEWithLogitsLoss()
-
-epochs = 50
-
 # Training loop
-for epoch in range(epochs):
-    model.train()  # Set the model to training mode
+def train(model, train_loader, optimizer):
+    model.train()
+    epochs = 35
+    criterion = nn.BCEWithLogitsLoss()
+    for epoch in range(epochs):
+        model.train()  # Set the model to training mode
 
-    running_loss = 0.0
-    total_samples = 0
+        running_loss = 0.0
+        total_samples = 0
 
-    for i, (inputs, labels) in enumerate(train_loader):
-        if torch.cuda.is_available():
-            inputs = inputs.cuda()
-            labels = labels.cuda()
+        for i, (inputs, labels) in enumerate(train_loader):
+            if torch.cuda.is_available():
+                inputs = inputs.cuda()
+                labels = labels.cuda()
 
-        optimizer.zero_grad()
-        outputs = model(inputs)
+            optimizer.zero_grad()
+            outputs = model(inputs)
 
-        loss = criterion(outputs, labels)
+            loss = criterion(outputs, labels)
 
-        loss.backward()
-        optimizer.step()
+            loss.backward()
+            optimizer.step()
 
-        running_loss += loss.item()
-        total_samples += inputs.size(0)
+            running_loss += loss.item()
+            total_samples += inputs.size(0)
 
-    print(f"Epoch [{epoch + 1}/{epochs}],\n Train Loss: {running_loss / total_samples:.4f}")
-    evaluate_model(model, test_loader)
+        train_loss = running_loss / total_samples
+        print(f"Epoch [{epoch + 1}/{epochs}],\n Train Loss: {train_loss:.4f}")
+        return train_loss
+    
 
-torch.save(model.state_dict(), "trained_model_weights_equi.pth")
+#torch.save(model.state_dict(), "trained_model_weights_equi.pth")
 
 #model.load_state_dict(torch.load("trained_model_weights.pth"))
+
+
+def main():
+
+    # Create an instance of the model
+    #model = CustomVGG16(num_classes=11)
+    sphere_model = SphereNet()
+    model = CustomCNN()
+
+    if torch.cuda.is_available():
+        sphere_model = sphere_model.cuda()
+        model = model.cuda()
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    criterion = nn.BCEWithLogitsLoss()
+
+    epochs = 50
+    #torch.manual_seed(args.seed)
+
+    #device = torch.device('cuda')
+
+    data_transform = transforms.Compose([
+        transforms.Resize((512, 1024)),
+        transforms.ToTensor()])
+
+    # Load the full CSV file
+    df = pd.read_csv('/home/mstveras/pesquisa-mestrado/img_classes2.csv')
+
+    # Split the DataFrame into train and test sets (you can modify this accordingly)
+    train_df = df[:1000]
+    test_df = df[1000:]
+
+    # Create custom datasets and data loaders
+    train_dataset = CustomDataset(train_df, "/home/mstveras/pesquisa-mestrado/structured3d_repo/struct3d_images", transform=data_transform)
+    test_dataset = CustomDataset(test_df, "/home/mstveras/pesquisa-mestrado/structured3d_repo/struct3d_images", transform=data_transform)
+
+    batch_size = 4
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
+    loss_train=[]
+    loss_train_std=[]
+    loss_test=[]
+    loss_test_std=[]
+
+    for epoch in range(1, epochs + 1):
+        ## SphereCNN
+        print('{} Sphere CNN {}'.format('='*10, '='*10))
+        loss_train.append(train(sphere_model, train_loader, optimizer))
+        loss_test.append(test(sphere_model, test_loader))
+
+        # Conventional CNN
+        print('{} Conventional CNN {}'.format('='*10, '='*10))
+        loss_train_std.append(train(model, train_loader, optimizer))
+        loss_test_std.append(test(model, test_loader))
+
+
+    #informar o vetor de Ã©pocas no lugar no np.array(list.........
+    epochs = np.array(list(range(0,2*len(loss_train),2)))
+
+
+    plt.figure(figsize=(10, 5))
+
+    plt.plot(epochs, loss_train, 'r', label='Training Loss') # plotting t, a separately 
+    plt.plot(epochs, loss_test, 'b', label='Validation Loss') # plotting t, b separately 
+    plt.plot(epochs, loss_train_std, 'g', label='Training Loss std') # plotting t, a separately 
+    plt.plot(epochs, loss_test_std, 'y', label='Validation Loss std') # plotting t, b separately 
+    plt.legend(loc='upper right')
+    plt.grid(linestyle=':')
+    plt.xlabel('Epochs',fontsize=18)
+    plt.ylabel('Loss',fontsize=18)
+
+    plt.show()
+
+
+
+if __name__ == '__main__':
+    main()
