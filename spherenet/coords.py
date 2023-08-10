@@ -80,35 +80,3 @@ def uv2img_idx(uv, h, w, u_fov, v_fov, v_c):
         y = 256
     '''
     return np.stack([y, x], axis=0)
-
-import shutil
-import os
-
-path = "/home/manuel/cv/trab-cv-final/animals/train"
-dirs = os.listdir( path )
-
-file = 'image_1.txt'
-
-# This would print all the files and directories
-#for file in dirs:
-#    if file.endswith('txt'):
-with open(f'{path}/{file}') as f:
-    print(file)
-    labels, x_min, y_min, x_max, y_max = f.read().split()
-
-    u = np.array([int(float(x_min)*256), int(float(x_max)*256)])
-    v = np.array([int(float(y_min)*256), int(float(y_max)*256)])
-
-    print(u,v)
-    fov = 120 * np.pi / 180    
-    #u, v = np.meshgrid(u, v)
-    u = (u) * fov / 256 - fov/2
-    v = (v) * fov / 256 - fov/2
-
-    uv = np.stack([u, v], axis=-1)
-    print(uv)
-
-    img_idx = uv2img_idx(uv, 256, 256, fov, fov,0)
-    #x = map_coordinates(img, img_idx, order=1)
-    print(img_idx)
-    #sys.exit(0)

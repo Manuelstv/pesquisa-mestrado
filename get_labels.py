@@ -5,8 +5,8 @@ import os
 import pandas as pd
 
 dictionary = {
-    1: "wall",
-    2: "floor",
+    #1: "wall",
+    #2: "floor",
     3: "cabinet",
     4: "bed",
     5: "chair",
@@ -49,8 +49,8 @@ dictionary = {
 
 cores = np.array([
     #(0, 0, 0),
-    (174, 199, 232),    # wall
-    (152, 223, 138),    # floor
+    #(174, 199, 232),    # wall
+    #(152, 223, 138),    # floor
     (31, 119, 180),     # cabinet
     (255, 187, 120),    # bed
     (188, 189, 34),     # chair
@@ -86,12 +86,12 @@ cores = np.array([
     (96, 207, 209),
     (227, 119, 194),    # bathtub
     (213, 92, 176),
-    (94, 106, 211),
-    (82, 84, 163),      # otherfurn
-    (100, 85, 144)
+    #(94, 106, 211),
+    #(82, 84, 163),      # otherfurn
+    #(100, 85, 144)
 ])
 
-root_dir = '/home/mstveras/pesquisa-mestrado/Structured3D'
+root_dir = '/home/mstveras/Structured3D'
 
 df = pd.DataFrame()
 
@@ -117,11 +117,16 @@ for dirpath, dirnames, filenames in os.walk(root_dir):
             parts = image_path.split('/')
             # Encontrar a parte que contém "scene_*"
             scene_part = [part for part in parts if part.startswith("scene_")]
+
+
+            #print(parts[4], parts[6])
             row_data = {
-            'col1': parts[5],
-            'col2': parts[7],
+            'col1': parts[4],
+            'col2': parts[6],
             'col3': indices_cores
             }
+
+            #print(parts[6], parts[8])
             df = df.append(row_data, ignore_index=True)
 
 # Convert integer values in col2 to strings
@@ -145,6 +150,8 @@ df = df.drop(['col1', 'col2', 'col3'], axis=1)
 
 print(df.sum())
 
+
+'''
 T = 200
 
 # Calculate the sum of each column
@@ -163,6 +170,6 @@ mask = column_sums > 900
 # Drop columns based on the mask
 df = df.drop(df.columns[1:][mask], axis=1)
 
-
-df.to_csv('img_classess.csv')
+'''
+df.to_csv('img_classess_big.csv')
 
