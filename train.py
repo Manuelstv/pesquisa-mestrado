@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 from sklearn.metrics import accuracy_score, precision_score, recall_score, hamming_loss, jaccard_score, f1_score
 import torch.nn.functional as F
-
+from torch.optim.lr_scheduler import StepLR
 import torch.nn.init as init
 
 from spherenet import SphereConv2D, SphereMaxPool2D
@@ -41,17 +41,10 @@ class SphereNet(nn.Module):
         self.pool7 = SphereMaxPool2D(stride=2)
         self.conv8 = SphereConv2D(3*128, 3*256, stride=1)
         self.pool8 = SphereMaxPool2D(stride=2)
-        self.conv9 = SphereConv2D(3*256, 3*512, stride=1)
-        self.pool9 = SphereMaxPool2D(stride=2)
-        self.fully = nn.Sequential(nn.Linear(3072, 10))
+        #self.conv9 = SphereConv2D(3*256, 3*512, stride=1)
+        #self.pool9 = SphereMaxPool2D(stride=2)
+        self.fully = nn.Sequential(nn.Linear(6144,3072), nn.Linear(3072, 10))
 
-        # Initialize convolutional layers using He Initialization
-        self._init_layers()
-
-    def _init_layers(self):
-        for layer in self.modules():
-            if isinstance(layer, nn.Conv2d):
-                init.kaiming_normal_(layer.weight, mode='fan_out', nonlinearity='relu')
 
     def forward(self, x):
         x = F.relu(self.pool1(self.conv1(x)))
@@ -60,10 +53,11 @@ class SphereNet(nn.Module):
         x = F.relu(self.pool4(self.conv4(x)))
         x = F.relu(self.pool5(self.conv5(x)))
         x = F.relu(self.pool6(self.conv6(x)))
-        x = F.relu(self.pool7(self.conv7(x)))
-        x = F.relu(self.pool8(self.conv8(x)))
-        x = F.relu(self.pool9(self.conv9(x)))
-        x = x.view(-1, 3072)  # flatten, [B, C, H, W) -> (B, C*H*W)
+        #x = F.relu(self.pool7(self.conv7(x)))
+        #x = F.relu(self.pool8(self.conv8(x)))
+        #print(x.size())
+        #x = F.relu(self.pool9(self.conv9(x)))
+        x = x.view(-1, 6144)  # flatten, [B, C, H, W) -> (B, C*H*W)
         x = self.fully(x)        
         return x
 
@@ -129,61 +123,6 @@ def test(model, data_loader):
     #print(f'precision = {precision}, recall = {recall}, f1-score= {f1_score}')
     return test_loss
 
-# Define the model
-class CustomCNN(nn.Module):
-    def __init__(self):
-        super(CustomCNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 3*2, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(3*2, 3*4, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(3*4, 3*8, kernel_size=3, padding=1)
-        self.conv4 = nn.Conv2d(3*8, 3*16, kernel_size=3, padding=1)
-        self.conv5 = nn.Conv2d(3*16, 3*32, kernel_size=3, padding=1)
-        self.conv6 = nn.Conv2d(3*32, 3*64, kernel_size=3, padding=1)
-        self.conv7 = nn.Conv2d(3*64, 3*128, kernel_size=3, padding=1)
-        self.conv8 = nn.Conv2d(3*128, 3*256, kernel_size=3, padding=1)
-        self.conv9 = nn.Conv2d(3*256, 3*512, kernel_size=3, padding=1)
-        #self.conv6 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
-        #self.fc = nn.Linear(8192, 4096)
-        self.fully = nn.Sequential(nn.Linear(3072, 10))
-
-    def forward(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = F.relu(F.max_pool2d(self.conv2(x), 2))
-        x = F.relu(F.max_pool2d(self.conv3(x), 2))
-        x = F.relu(F.max_pool2d(self.conv4(x), 2))
-        x = F.relu(F.max_pool2d(self.conv5(x), 2)) 
-        x = F.relu(F.max_pool2d(self.conv6(x), 2))
-        x = F.relu(F.max_pool2d(self.conv7(x), 2))
-        x = F.relu(F.max_pool2d(self.conv8(x), 2)) 
-        x = F.relu(F.max_pool2d(self.conv9(x), 2))
-        
-        x = x.view(-1, 3072) 
-        x = self.fully(x)
-        #print(x.size())
-        return x
-
-class CustomVGG16(nn.Module):
-    def __init__(self, num_classes=11):
-        super(CustomVGG16, self).__init__()
-        vgg16 = models.vgg16(pretrained=True)
-        
-        # Freeze all layers
-        for param in vgg16.parameters():
-            param.requires_grad = False
-        
-        # Modify the classifier
-        num_features = vgg16.classifier[6].in_features
-        vgg16.classifier[6] = nn.Sequential(
-            nn.Linear(num_features, 4096),  # Adjust based on your needs
-            nn.ReLU(inplace=True),
-            nn.Linear(4096, num_classes)    # Output size for multi-label classification
-        )
-        
-        self.vgg16 = vgg16
-
-    def forward(self, x):
-        return self.vgg16(x)
-
 # Training loop
 def train(model, train_loader, optimizer, epoch):
     model.train()
@@ -226,6 +165,7 @@ def main():
     #model = CustomVGG16(num_classes=11)
     sphere_model = SphereNet()
     #model_cnn = CustomCNN()
+    #sphere_model.load_state_dict(torch.load("best_spher_model.pth"))
 
     if torch.cuda.is_available():
         sphere_model = sphere_model.cuda()
@@ -244,7 +184,7 @@ def main():
     #device = torch.device('cuda')
 
     data_transform = transforms.Compose([
-        transforms.Resize((512, 1024)),
+        transforms.Resize((256, 512)),
         transforms.ToTensor()])
 
     # Load the full CSV file
@@ -258,7 +198,7 @@ def main():
     train_dataset = CustomDataset(train_df, "/home/mstveras/struct3d-data", transform=data_transform)
     test_dataset = CustomDataset(test_df, "/home/mstveras/struct3d-data", transform=data_transform)
 
-    batch_size = 2
+    batch_size = 16
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
@@ -270,6 +210,7 @@ def main():
     best_val_loss = float('inf')
     patience = 10
 
+    scheduler = StepLR(optimizer_sphere, step_size=20, gamma=0.1)  # Adjust the step_size and gamma values as needed
 
     for epoch in range(1, epochs + 1):
         
@@ -285,10 +226,12 @@ def main():
         #val_loss = test(model_cnn, test_loader)
         #loss_test_std.append(val_loss)
 
+        scheduler.step()
+
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             counter = 0
-            torch.save(sphere_model.state_dict(), 'best_spher_model.pth')  # Save the best model
+            torch.save(sphere_model.state_dict(), 'best_spher_model_lccr3.pth')  # Save the best model
             #torch.save(model_cnn.state_dict(), 'best_sphere_model.pth')  # Save the best model
 
         else:

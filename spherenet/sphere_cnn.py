@@ -120,7 +120,7 @@ class SphereConv2D(nn.Module):
         with torch.no_grad():
             grid = self.grid.repeat(x.shape[0], 1, 1, 1)
 
-        x = nn.functional.grid_sample(x, grid, mode=self.mode)
+        x = nn.functional.grid_sample(x, grid, mode=self.mode, align_corners=True)
         x = nn.functional.conv2d(x, self.weight, self.bias, stride=3)
         return x
 
@@ -148,7 +148,7 @@ class SphereMaxPool2D(nn.Module):
         with torch.no_grad():
             grid = self.grid.repeat(x.shape[0], 1, 1, 1)
 
-        return self.pool(nn.functional.grid_sample(x, grid, mode=self.mode))
+        return self.pool(nn.functional.grid_sample(x, grid, mode=self.mode, align_corners=True))
 
 
 if __name__ == '__main__':

@@ -139,12 +139,12 @@ class CustomCNN(nn.Module):
         self.conv4 = nn.Conv2d(3*8, 3*16, kernel_size=3, padding=1)
         self.conv5 = nn.Conv2d(3*16, 3*32, kernel_size=3, padding=1)
         self.conv6 = nn.Conv2d(3*32, 3*64, kernel_size=3, padding=1)
-        self.conv7 = nn.Conv2d(3*64, 3*128, kernel_size=3, padding=1)
-        self.conv8 = nn.Conv2d(3*128, 3*256, kernel_size=3, padding=1)
-        self.conv9 = nn.Conv2d(3*256, 3*512, kernel_size=3, padding=1)
+        #self.conv7 = nn.Conv2d(3*64, 3*128, kernel_size=3, padding=1)
+        #self.conv8 = nn.Conv2d(3*128, 3*256, kernel_size=3, padding=1)
+        #s#elf.conv9 = nn.Conv2d(3*256, 3*512, kernel_size=3, padding=1)
         #self.conv6 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
         #self.fc = nn.Linear(8192, 4096)
-        self.fully = nn.Sequential(nn.Linear(3072, 10))
+        self.fully = nn.Sequential(nn.Linear(6144,3072), nn.Linear(3072, 10))
 
         # Initialize convolutional layers using He Initialization
         #self._init_layers()
@@ -156,16 +156,24 @@ class CustomCNN(nn.Module):
 
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
+        #print(x.size())
         x = F.relu(F.max_pool2d(self.conv2(x), 2))
+        #print(x.size())
         x = F.relu(F.max_pool2d(self.conv3(x), 2))
+        #print(x.size())
         x = F.relu(F.max_pool2d(self.conv4(x), 2))
+        #print(x.size())
         x = F.relu(F.max_pool2d(self.conv5(x), 2)) 
+        #print(x.size())
         x = F.relu(F.max_pool2d(self.conv6(x), 2))
-        x = F.relu(F.max_pool2d(self.conv7(x), 2))
-        x = F.relu(F.max_pool2d(self.conv8(x), 2)) 
-        x = F.relu(F.max_pool2d(self.conv9(x), 2))
-        
-        x = x.view(-1, 3072) 
+        #print(x.size())
+        #x = F.relu(F.max_pool2d(self.conv7(x), 2))
+        #print(x.size())
+        #x = F.relu(F.max_pool2d(self.conv8(x), 2)) 
+        #print(x.size())
+        #x = F.relu(F.max_pool2d(self.conv9(x), 2))
+        #print(x.size())
+        x = x.view(-1, 6144) 
         x = self.fully(x)
         #print(x.size())
         return x
@@ -252,7 +260,7 @@ def main():
     #device = torch.device('cuda')
 
     data_transform = transforms.Compose([
-        transforms.Resize((512, 1024)),
+        transforms.Resize((256, 512)),
         transforms.ToTensor()])
 
     # Load the full CSV file
@@ -266,7 +274,7 @@ def main():
     train_dataset = CustomDataset(train_df, "/home/mstveras/struct3d-data", transform=data_transform)
     test_dataset = CustomDataset(test_df, "/home/mstveras/struct3d-data", transform=data_transform)
 
-    batch_size = 2
+    batch_size = 16
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
@@ -297,7 +305,7 @@ def main():
             best_val_loss = val_loss
             counter = 0
             #torch.save(sphere_model.state_dict(), 'best_spher_model.pth')  # Save the best model
-            torch.save(model_cnn.state_dict(), 'best_planar_model2.pth')  # Save the best model
+            torch.save(model_cnn.state_dict(), 'best_planar_modsdsdel222.pth')  # Save the best model
 
         else:
             counter += 1

@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 from sklearn.metrics import accuracy_score, precision_score, recall_score, hamming_loss, jaccard_score, f1_score
 import torch.nn.functional as F
+from sklearn.metrics import f1_score
 
 import torch.nn.init as init
 
@@ -46,17 +47,10 @@ class SphereNet(nn.Module):
         self.pool7 = SphereMaxPool2D(stride=2)
         self.conv8 = SphereConv2D(3*128, 3*256, stride=1)
         self.pool8 = SphereMaxPool2D(stride=2)
-        self.conv9 = SphereConv2D(3*256, 3*512, stride=1)
-        self.pool9 = SphereMaxPool2D(stride=2)
-        self.fully = nn.Sequential(nn.Linear(3072, 10))
+        #self.conv9 = SphereConv2D(3*256, 3*512, stride=1)
+        #self.pool9 = SphereMaxPool2D(stride=2)
+        self.fully = nn.Sequential(nn.Linear(6144,3072), nn.Linear(3072, 10))
 
-        # Initialize convolutional layers using He Initialization
-        self._init_layers()
-
-    def _init_layers(self):
-        for layer in self.modules():
-            if isinstance(layer, nn.Conv2d):
-                init.kaiming_normal_(layer.weight, mode='fan_out', nonlinearity='relu')
 
     def forward(self, x):
         x = F.relu(self.pool1(self.conv1(x)))
@@ -65,10 +59,11 @@ class SphereNet(nn.Module):
         x = F.relu(self.pool4(self.conv4(x)))
         x = F.relu(self.pool5(self.conv5(x)))
         x = F.relu(self.pool6(self.conv6(x)))
-        x = F.relu(self.pool7(self.conv7(x)))
-        x = F.relu(self.pool8(self.conv8(x)))
-        x = F.relu(self.pool9(self.conv9(x)))
-        x = x.view(-1, 3072)  # flatten, [B, C, H, W) -> (B, C*H*W)
+        #x = F.relu(self.pool7(self.conv7(x)))
+        #x = F.relu(self.pool8(self.conv8(x)))
+        #print(x.size())
+        #x = F.relu(self.pool9(self.conv9(x)))
+        x = x.view(-1, 6144)  # flatten, [B, C, H, W) -> (B, C*H*W)
         x = self.fully(x)        
         return x
 
@@ -130,6 +125,12 @@ def test(model, data_loader):
     print(f'Hamming loss = {hamming_loss_value}')
     print(f'Zero-One Accuracy = {zero_one_accuracy}')
 
+    f1_scores_per_class = []
+    for class_idx in range(10):
+        f1 = f1_score(all_labels[:, class_idx], all_predictions[:, class_idx])
+        f1_scores_per_class.append(f1)
+    print("F1 Scores for Each Class:", f1_scores_per_class)
+
     return test_loss, hamming_loss_value
 
 # Define the model
@@ -142,15 +143,15 @@ class CustomCNN(nn.Module):
         self.conv4 = nn.Conv2d(3*8, 3*16, kernel_size=3, padding=1)
         self.conv5 = nn.Conv2d(3*16, 3*32, kernel_size=3, padding=1)
         self.conv6 = nn.Conv2d(3*32, 3*64, kernel_size=3, padding=1)
-        self.conv7 = nn.Conv2d(3*64, 3*128, kernel_size=3, padding=1)
-        self.conv8 = nn.Conv2d(3*128, 3*256, kernel_size=3, padding=1)
-        self.conv9 = nn.Conv2d(3*256, 3*512, kernel_size=3, padding=1)
+        #self.conv7 = nn.Conv2d(3*64, 3*128, kernel_size=3, padding=1)
+        #self.conv8 = nn.Conv2d(3*128, 3*256, kernel_size=3, padding=1)
+        #s#elf.conv9 = nn.Conv2d(3*256, 3*512, kernel_size=3, padding=1)
         #self.conv6 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
         #self.fc = nn.Linear(8192, 4096)
-        self.fully = nn.Sequential(nn.Linear(3072, 10))
+        self.fully = nn.Sequential(nn.Linear(6144,3072), nn.Linear(3072, 10))
 
         # Initialize convolutional layers using He Initialization
-        self._init_layers()
+        #self._init_layers()
 
     def _init_layers(self):
         for layer in self.modules():
@@ -159,19 +160,28 @@ class CustomCNN(nn.Module):
 
     def forward(self, x):
         x = F.relu(F.max_pool2d(self.conv1(x), 2))
+        #print(x.size())
         x = F.relu(F.max_pool2d(self.conv2(x), 2))
+        #print(x.size())
         x = F.relu(F.max_pool2d(self.conv3(x), 2))
+        #print(x.size())
         x = F.relu(F.max_pool2d(self.conv4(x), 2))
+        #print(x.size())
         x = F.relu(F.max_pool2d(self.conv5(x), 2)) 
+        #print(x.size())
         x = F.relu(F.max_pool2d(self.conv6(x), 2))
-        x = F.relu(F.max_pool2d(self.conv7(x), 2))
-        x = F.relu(F.max_pool2d(self.conv8(x), 2)) 
-        x = F.relu(F.max_pool2d(self.conv9(x), 2))
-        
-        x = x.view(-1, 3072) 
+        #print(x.size())
+        #x = F.relu(F.max_pool2d(self.conv7(x), 2))
+        #print(x.size())
+        #x = F.relu(F.max_pool2d(self.conv8(x), 2)) 
+        #print(x.size())
+        #x = F.relu(F.max_pool2d(self.conv9(x), 2))
+        #print(x.size())
+        x = x.view(-1, 6144) 
         x = self.fully(x)
         #print(x.size())
         return x
+
 
 
 #torch.save(model.state_dict(), "trained_model_weights_equi.pth")
@@ -186,9 +196,9 @@ def main():
     model_cnn = CustomCNN()
 
     
-    model_cnn.load_state_dict(torch.load("best_planar_model.pth"))
+    model_cnn.load_state_dict(torch.load("best_planar_modsdsdel222.pth"))
 
-    sphere_model.load_state_dict(torch.load("best_spher_model.pth"))
+    sphere_model.load_state_dict(torch.load("best_spher_model_lccr3.pth"))
 
     if torch.cuda.is_available():
         sphere_model = sphere_model.cuda()
@@ -197,7 +207,7 @@ def main():
     #scheduler,
 
     data_transform = transforms.Compose([
-        transforms.Resize((512, 1024)),
+        transforms.Resize((256, 512)),
         transforms.ToTensor()])
 
     # Load the full CSV file
@@ -207,7 +217,7 @@ def main():
 
     test_dataset = CustomDataset(test_df, "/home/mstveras/struct3d-data", transform=data_transform)
 
-    batch_size = 2
+    batch_size = 4
 
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
