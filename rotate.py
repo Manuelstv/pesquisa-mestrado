@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from scipy.stats import special_ortho_group
 from scipy.spatial.transform import Rotation as R
 
+import os
 import cv2
 import numpy as np
 from glob import glob
@@ -49,27 +50,34 @@ class SphericalImage(object):
     def getMap(self): return self.mapped
 
 
-if __name__ == "__main__":
-
+def rotate_img(image_path):
     #R = special_ortho_group.rvs(3)
+    alpha_range = (-45, 45)  
+    beta_range = (-45, 45)  
+    gamma_range = (-45, 45)  
 
-    # Define angle ranges
-    alpha_range = (-30, 30)  # Example range for alpha angle
-    beta_range = (-30, 30)   # Example range for beta angle
-    gamma_range = (-30, 30)  # Example range for gamma angle
-
-    # Generate a random rotation matrix
     alpha = np.random.uniform(*alpha_range)
     beta = np.random.uniform(*beta_range)
     gamma = np.random.uniform(*gamma_range)
 
     rotation = R.from_euler('ZYX', [gamma, beta, alpha], degrees=True)
-    R = rotation.as_matrix()
+    Rot = rotation.as_matrix()
+
+    try:
+        img = imread(image_path)
+        img2 = synthesizeRotation(img, Rot)
+        if img is None:
+            print(image_path)
+    except Exception as e:
+        print("An error occurred:", e)
+    
+    return img2
 
 
-    print(R)
+if __name__ == "__main__":
 
-    img = imread('/home/mstveras/Pictures/vale/darktable_exported/IMG_0525.jpg')
-    img2 = synthesizeRotation(img, R)
-    imsave('rotated.png', img2)
-
+    for image_path in os.listdir('/home/mstveras/struct3d-data'):
+        
+        img2 = rotate_img(f'/home/mstveras/struct3d-data/{image_path}')
+        print(f'/home/mstveras/rotated-struct3d/{image_path}')
+        cv2.imwrite(f'/home/mstveras/rotated-45-struct3d/{image_path}', img2)

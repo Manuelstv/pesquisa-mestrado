@@ -305,7 +305,7 @@ def main():
             best_val_loss = val_loss
             counter = 0
             #torch.save(sphere_model.state_dict(), 'best_spher_model.pth')  # Save the best model
-            torch.save(model_cnn.state_dict(), 'best_planar_modsdsdel222.pth')  # Save the best model
+            torch.save(model_cnn.state_dict(), 'best_planar_model.pth')  # Save the best model
 
         else:
             counter += 1

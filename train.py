@@ -14,11 +14,14 @@ import torch.nn.init as init
 
 from spherenet import SphereConv2D, SphereMaxPool2D
 from torch import nn
+
+import torchvision
 import torchvision.datasets as datasets
 from equi_conv import EquiConv2d, equi_conv2d
 torch.cuda.empty_cache()
 
-torch.cuda.empty_cache()
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
 
 import torchvision.models as models
 
@@ -37,10 +40,10 @@ class SphereNet(nn.Module):
         self.pool5 = SphereMaxPool2D(stride=2)
         self.conv6 = SphereConv2D(3*32, 3*64, stride=1)
         self.pool6 = SphereMaxPool2D(stride=2)
-        self.conv7 = SphereConv2D(3*64, 3*128, stride=1)
-        self.pool7 = SphereMaxPool2D(stride=2)
-        self.conv8 = SphereConv2D(3*128, 3*256, stride=1)
-        self.pool8 = SphereMaxPool2D(stride=2)
+        #self.conv7 = SphereConv2D(3*64, 3*128, stride=1)
+        #self.pool7 = SphereMaxPool2D(stride=2)
+        #self.conv8 = SphereConv2D(3*128, 3*256, stride=1)
+        #self.pool8 = SphereMaxPool2D(stride=2)
         #self.conv9 = SphereConv2D(3*256, 3*512, stride=1)
         #self.pool9 = SphereMaxPool2D(stride=2)
         self.fully = nn.Sequential(nn.Linear(6144,3072), nn.Linear(3072, 10))
@@ -74,8 +77,6 @@ class CustomDataset(Dataset):
         img_name = os.path.join(self.directory, self.dataframe.iloc[idx, 1]) # Assuming 'combined' contains the image file names
         image = Image.open(img_name).convert('RGB')
         labels = torch.tensor(self.dataframe.iloc[idx, 2:].values.astype(np.float32))  # Convert labels to float32
-
-
         if self.transform:
             image = self.transform(image)
 
@@ -137,17 +138,20 @@ def train(model, train_loader, optimizer, epoch):
         if torch.cuda.is_available():
             inputs = inputs.cuda()
             labels = labels.cuda()
+            #print(inputs)
 
         optimizer.zero_grad()
         outputs = model(inputs)
 
         loss = criterion(outputs, labels)
-
+        writer.add_scalar("Loss/train", loss, epoch)
         loss.backward()
         optimizer.step()
 
         running_loss += loss.item()
         total_samples += inputs.size(0)
+    
+    writer.flush()
 
     train_loss = running_loss / total_samples
     print(f"Epoch [{epoch + 1}],\n Train Loss: {train_loss:.4f}")
@@ -157,6 +161,18 @@ def train(model, train_loader, optimizer, epoch):
 
 #torch.save(model.state_dict(), "trained_model_weights_equi.pth")
 #model.load_state_dict(torch.load("trained_model_weights.pth"))
+
+# helper function to show an image
+# (used in the `plot_classes_preds` function below)
+def matplotlib_imshow(img, one_channel=False):
+    if one_channel:
+        img = img.mean(dim=0)
+    img = img / 2 + 0.5     # unnormalize
+    npimg = img.numpy()
+    if one_channel:
+        plt.imshow(npimg, cmap="Greys")
+    else:
+        plt.imshow(np.transpose(npimg, (1, 2, 0)))
 
 
 def main():
@@ -175,12 +191,11 @@ def main():
     #scheduler,
 
     #optimizer_cnn = torch.optim.Adam(model_cnn.parameters(), lr=1e-4)
-    optimizer_sphere = torch.optim.Adam(sphere_model.parameters(), lr=1e-4)
+    optimizer_sphere = torch.optim.Adam(sphere_model.parameters(), lr=1e-4, weight_decay=0.001)
     criterion = nn.BCEWithLogitsLoss()
 
-    epochs = 500
+    epochs = 1
     #torch.manual_seed(args.seed)
-
     #device = torch.device('cuda')
 
     data_transform = transforms.Compose([
@@ -203,6 +218,22 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
+    # get some random training images
+    dataiter = iter(train_loader)
+    images, labels = next(dataiter)
+
+    #writer.add_graph(sphere_model, images)
+    #writer.close()
+
+    # create grid of images
+    img_grid = torchvision.utils.make_grid(images)
+
+    # show images
+    matplotlib_imshow(img_grid, one_channel=True)
+
+    # write to tensorboard
+    writer.add_image('example_imgs', img_grid)
+
     loss_train=[]
     loss_train_std=[]
     loss_test=[]
@@ -210,7 +241,7 @@ def main():
     best_val_loss = float('inf')
     patience = 10
 
-    scheduler = StepLR(optimizer_sphere, step_size=20, gamma=0.1)  # Adjust the step_size and gamma values as needed
+    #scheduler = StepLR(optimizer_sphere, step_size=15, gamma=0.5)  # Adjust the step_size and gamma values as needed
 
     for epoch in range(1, epochs + 1):
         
@@ -226,12 +257,12 @@ def main():
         #val_loss = test(model_cnn, test_loader)
         #loss_test_std.append(val_loss)
 
-        scheduler.step()
+        #scheduler.step()
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             counter = 0
-            torch.save(sphere_model.state_dict(), 'best_spher_model_lccr3.pth')  # Save the best model
+            torch.save(sphere_model.state_dict(), 'best_sphere_tb.pth')  # Save the best model
             #torch.save(model_cnn.state_dict(), 'best_sphere_model.pth')  # Save the best model
 
         else:
@@ -246,8 +277,9 @@ def main():
         #loss_train_std.append(train(model_cnn, train_loader, optimizer_cnn))
         #loss_test_std.append(test(model_cnn, test_loader))
 
-
+    writer.close()
     #informar o vetor de Ã©pocas no lugar no np.array(list.........
+    '''
     epochs = np.array(list(range(0,2*len(loss_train),2)))
 
 
@@ -261,10 +293,8 @@ def main():
     plt.grid(linestyle=':')
     plt.xlabel('Epochs',fontsize=18)
     plt.ylabel('Loss',fontsize=18)
-
     plt.show()
-
-
-
+    '''
+    
 if __name__ == '__main__':
     main()

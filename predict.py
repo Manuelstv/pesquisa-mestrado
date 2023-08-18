@@ -43,10 +43,10 @@ class SphereNet(nn.Module):
         self.pool5 = SphereMaxPool2D(stride=2)
         self.conv6 = SphereConv2D(3*32, 3*64, stride=1)
         self.pool6 = SphereMaxPool2D(stride=2)
-        self.conv7 = SphereConv2D(3*64, 3*128, stride=1)
-        self.pool7 = SphereMaxPool2D(stride=2)
-        self.conv8 = SphereConv2D(3*128, 3*256, stride=1)
-        self.pool8 = SphereMaxPool2D(stride=2)
+        #self.conv7 = SphereConv2D(3*64, 3*128, stride=1)
+        #self.pool7 = SphereMaxPool2D(stride=2)
+        #self.conv8 = SphereConv2D(3*128, 3*256, stride=1)
+        #self.pool8 = SphereMaxPool2D(stride=2)
         #self.conv9 = SphereConv2D(3*256, 3*512, stride=1)
         #self.pool9 = SphereMaxPool2D(stride=2)
         self.fully = nn.Sequential(nn.Linear(6144,3072), nn.Linear(3072, 10))
@@ -196,9 +196,9 @@ def main():
     model_cnn = CustomCNN()
 
     
-    model_cnn.load_state_dict(torch.load("best_planar_modsdsdel222.pth"))
+    model_cnn.load_state_dict(torch.load("best_planar_model.pth"))
 
-    sphere_model.load_state_dict(torch.load("best_spher_model_lccr3.pth"))
+    sphere_model.load_state_dict(torch.load("best_sphere_rot.pth"))
 
     if torch.cuda.is_available():
         sphere_model = sphere_model.cuda()
@@ -215,9 +215,9 @@ def main():
 
     test_df = df[4171:]
 
-    test_dataset = CustomDataset(test_df, "/home/mstveras/struct3d-data", transform=data_transform)
+    test_dataset = CustomDataset(test_df, "/home/mstveras/rotated-struct3d", transform=data_transform)
 
-    batch_size = 4
+    batch_size = 16
 
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
