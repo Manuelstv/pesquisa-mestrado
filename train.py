@@ -1,3 +1,4 @@
+import argparse
 import pandas as pd
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
@@ -24,6 +25,40 @@ from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
 import torchvision.models as models
+
+class CustomCNN(nn.Module):
+    def __init__(self):
+        super(CustomCNN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 3*2, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(3*2, 3*4, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(3*4, 3*8, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(3*8, 3*16, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(3*16, 3*32, kernel_size=3, padding=1)
+        self.conv6 = nn.Conv2d(3*32, 3*64, kernel_size=3, padding=1)
+        #self.conv7 = nn.Conv2d(3*64, 3*128, kernel_size=3, padding=1)
+        #self.conv8 = nn.Conv2d(3*128, 3*256, kernel_size=3, padding=1)
+        #s#elf.conv9 = nn.Conv2d(3*256, 3*512, kernel_size=3, padding=1)
+        #self.conv6 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        #self.fc = nn.Linear(8192, 4096)
+        self.fully = nn.Sequential(nn.Linear(6144,3072), nn.Linear(3072, 10))
+
+    def forward(self, x):
+        x = F.relu(F.max_pool2d(self.conv1(x), 2))
+        #print(x.size())
+        x = F.relu(F.max_pool2d(self.conv2(x), 2))
+        #print(x.size())
+        x = F.relu(F.max_pool2d(self.conv3(x), 2))
+        #print(x.size())
+        x = F.relu(F.max_pool2d(self.conv4(x), 2))
+        #print(x.size())
+        x = F.relu(F.max_pool2d(self.conv5(x), 2)) 
+        #print(x.size())
+        x = F.relu(F.max_pool2d(self.conv6(x), 2))
+        x = x.view(-1, 6144) 
+        x = self.fully(x)
+        #print(x.size())
+        return x
+
 
 class SphereNet(nn.Module):
     def __init__(self):
@@ -177,26 +212,49 @@ def matplotlib_imshow(img, one_channel=False):
 
 def main():
 
+    # Training settings
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--batch-size', type=int, default=16, metavar='N',
+                        help='input batch size for training')
+    parser.add_argument('--test-batch-size', type=int, default=16, metavar='N',
+                        help='input batch size for testing')
+    parser.add_argument('--epochs', type=int, default=300, metavar='N',
+                        help='number of epochs to train')
+    parser.add_argument('--optimizer', type=str, default='adam',
+                        help='optimizer, options={"adam, sgd"}')
+    parser.add_argument('--mode', type=str, default='train',
+                        help='train/test, options={"train,test"}')
+    parser.add_argument('--net', type=str, default='sph',
+                        help='con/sph, options={"con, sph"}')
+    parser.add_argument('--lr', type=float, default=1E-4, metavar='LR',
+                        help='learning rate')
+    parser.add_argument('--save-interval', type=int, default=1, metavar='N',
+                        help='how many epochs to wait before saving model weights')
+    parser.add_argument('--seed', type=int, default=1, metavar='S',
+                        help='random seed')
+    args = parser.parse_args()
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+
+    
     # Create an instance of the model
     #model = CustomVGG16(num_classes=11)
-    sphere_model = SphereNet()
-    #model_cnn = CustomCNN()
-    #sphere_model.load_state_dict(torch.load("best_spher_model.pth"))
+    if args.net == 'sph':
+        print('{} Sphere CNN {}'.format('='*10, '='*10))
+        model = SphereNet()
+    
+    if args.net == 'con':
+        print('{} Conventional CNN {}'.format('='*10, '='*10))
+        model = CustomCNN()
 
     if torch.cuda.is_available():
-        sphere_model = sphere_model.cuda()
-        #model_cnn = model_cnn.cuda()
-
-
-    #scheduler,
-
-    #optimizer_cnn = torch.optim.Adam(model_cnn.parameters(), lr=1e-4)
-    optimizer_sphere = torch.optim.Adam(sphere_model.parameters(), lr=1e-4, weight_decay=0.001)
+        model = model.cuda()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=0.001)
+    
     criterion = nn.BCEWithLogitsLoss()
 
-    epochs = 1
-    #torch.manual_seed(args.seed)
-    #device = torch.device('cuda')
+    epochs = args.epochs
 
     data_transform = transforms.Compose([
         transforms.Resize((256, 512)),
@@ -213,7 +271,7 @@ def main():
     train_dataset = CustomDataset(train_df, "/home/mstveras/struct3d-data", transform=data_transform)
     test_dataset = CustomDataset(test_df, "/home/mstveras/struct3d-data", transform=data_transform)
 
-    batch_size = 16
+    batch_size = args.batch_size
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
@@ -221,9 +279,6 @@ def main():
     # get some random training images
     dataiter = iter(train_loader)
     images, labels = next(dataiter)
-
-    #writer.add_graph(sphere_model, images)
-    #writer.close()
 
     # create grid of images
     img_grid = torchvision.utils.make_grid(images)
@@ -235,36 +290,26 @@ def main():
     writer.add_image('example_imgs', img_grid)
 
     loss_train=[]
-    loss_train_std=[]
     loss_test=[]
-    loss_test_std=[]
     best_val_loss = float('inf')
     patience = 10
 
-    #scheduler = StepLR(optimizer_sphere, step_size=15, gamma=0.5)  # Adjust the step_size and gamma values as needed
+    scheduler = StepLR(optimizer, step_size=15, gamma=0.5)  # Adjust the step_size and gamma values as needed
 
     for epoch in range(1, epochs + 1):
         
         ## SphereCNN
-        print('{} Sphere CNN {}'.format('='*10, '='*10))
-        loss_train.append(train(sphere_model, train_loader, optimizer_sphere, epoch))
-        val_loss = test(sphere_model, test_loader)
+        loss_train.append(train(model, train_loader, optimizer, epoch))
+        val_loss = test(model, test_loader)
         loss_test.append(val_loss)
 
-        # Conventional CNN
-        #print('{} Conventional CNN {}'.format('='*10, '='*10))
-        #loss_train_std.append(train(model_cnn, train_loader, optimizer_cnn, epoch))
-        #val_loss = test(model_cnn, test_loader)
-        #loss_test_std.append(val_loss)
-
-        #scheduler.step()
+        scheduler.step()
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             counter = 0
-            torch.save(sphere_model.state_dict(), 'best_sphere_tb.pth')  # Save the best model
+            torch.save(model.state_dict(), 'best_sphere_tb2.pth')  # Save the best model
             #torch.save(model_cnn.state_dict(), 'best_sphere_model.pth')  # Save the best model
-
         else:
             counter += 1
 
@@ -272,29 +317,39 @@ def main():
             print("Early stopping triggered")
             break
 
-        # Conventional CNN
-        #print('{} Conventional CNN {}'.format('='*10, '='*10))
-        #loss_train_std.append(train(model_cnn, train_loader, optimizer_cnn))
-        #loss_test_std.append(test(model_cnn, test_loader))
+        #accuracy = accuracy_score(all_labels, all_predictions)
+        #precision = precision_score(all_labels, all_predictions, average='micro')
+        #recall = recall_score(all_labels, all_predictions, average='micro')
+        #f1 = f1_score(all_labels, all_predictions, average='micro')
+
+        ##writer.add_scalar("Metrics/accuracy", accuracy, epoch)
+        #writer.add_scalar("Metrics/precision", precision, epoch)
+        #writer.add_scalar("Metrics/recall", recall, epoch)
+        #writer.add_scalar("Metrics/f1_score", f1_score, epoch)
+
+        # Log parameter histograms
+        for name, param in model.named_parameters():
+            writer.add_histogram(name, param, epoch)
+
+        # Log notes and hyperparameters
+        writer.add_text("Notes", "Experiment results: SphereNet model training.")
+        hyperparams = {"learning_rate": 1e-4, "batch_size": batch_size, "epochs": epochs}
+        #writer.add_hparams(hyperparams, {"hparam/loss": loss})
 
     writer.close()
-    #informar o vetor de Ã©pocas no lugar no np.array(list.........
-    '''
-    epochs = np.array(list(range(0,2*len(loss_train),2)))
+    
 
+    # Custom plot for loss curves
+    plt.figure(figsize=(8, 6))
+    plt.plot(loss_train, label="Train Loss")
+    plt.plot(loss_test, label="Validation Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.grid()
+    writer.add_figure("Loss Curves", plt.gcf(), global_step=epoch)
 
-    plt.figure(figsize=(10, 5))
-
-    plt.plot(epochs, loss_train, 'r', label='Training Loss') # plotting t, a separately 
-    plt.plot(epochs, loss_test, 'b', label='Validation Loss') # plotting t, b separately 
-    plt.plot(epochs, loss_train_std, 'g', label='Training Loss std') # plotting t, a separately 
-    plt.plot(epochs, loss_test_std, 'y', label='Validation Loss std') # plotting t, b separately 
-    plt.legend(loc='upper right')
-    plt.grid(linestyle=':')
-    plt.xlabel('Epochs',fontsize=18)
-    plt.ylabel('Loss',fontsize=18)
-    plt.show()
-    '''
+    writer.close()
     
 if __name__ == '__main__':
     main()
